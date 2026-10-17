@@ -1,72 +1,51 @@
-from mlx_lm import load, generate
+import outlines
+import mlx_lm
 from datetime import datetime
-import json
-
-from src.models import ExtractionPayload
+from .models import ExtractionPayload
 
 MODEL_ID = "mlx-community/Qwen3-8B-4bit-DWQ-053125"
 
-# Load the model into Mac Unified Memory globally so it isn't reloaded on every request
-print(f"Loading MLX model: {MODEL_ID}...")
+print(f"Loading MLX model with Schema Enforcement: {MODEL_ID}...")
 try:
-    model, tokenizer = load(MODEL_ID)
-    print("✅ Model loaded successfully into Unified Memory.")
+    model = outlines.from_mlxlm(*mlx_lm.load(MODEL_ID))
+    generator = outlines.Generator(model, ExtractionPayload)
+    
+    print("✅ Constrained Model loaded successfully into Unified Memory.")
 except Exception as e:
     print(f"❌ Failed to load MLX model: {e}")
-    model, tokenizer = None, None
+    generator = None
 
 def extract_transactions_from_text(text: str) -> ExtractionPayload:
-    if not model or tokenizer:
+    if not generator:
         raise RuntimeError("LLM Generator is not initialized.")
     
+    # get current date incase input includes terms like 'today' or 'yesterday'
     today_str = datetime.now().strftime("%A, %Y-%m-%d")
-    schema_instructions = json.dumps(ExtractionPayload.model_json_schema(), indent=2)
     
-    prompt = f"""You are a precise financial data extraction API. 
-    Extract ALL financial transactions from the user's text.
+    prompt = f"""Extract ALL financial transactions from the user's text.
+IMPORTANT CONTEXT: Today is {today_str}. Calculate relative dates into YYYY-MM-DD.
 
-    IMPORTANT CONTEXT: 
-    Today is {today_str}. Use this to calculate relative dates (yesterday, last Friday) into YYYY-MM-DD format.
+User Text:
+"{text}"
+"""
 
-    You must reply with ONLY a raw JSON object that strictly matches the following JSON Schema:
-    {schema_instructions}
-
-    Do NOT wrap the output in ```json markdown blocks. 
-    Do NOT include any conversational text like "Here is your data". 
-    Output strictly the raw JSON bracket object and nothing else.
-
-    User Text:
-    "{text}"
-    """
-
-    # Generate the text response
-    raw_response = generate(
-        model, 
-        tokenizer, 
-        prompt=prompt, 
-        max_tokens=1000, 
-        verbose=False
-    )
+    # The generator returns the fully validated Pydantic object directly.
+    result = generator(prompt)
     
-    # Clean up the output in case the LLM disobeys and adds markdown blocks anyway
-    clean_json = raw_response.strip()
-    if clean_json.startswith("```json"):
-        clean_json = clean_json.replace("```json", "", 1)
-    if clean_json.endswith("```"):
-        clean_json = clean_json[:clean_json.rfind("```")]
-    clean_json = clean_json.strip()
+    # parse the json result into model
+    transaction = ExtractionPayload.model_validate_json(result)
+    
+    return transaction
+
+if __name__ == "__main__":
+    test_note = "Yesterday I grabbed Groceries at NTUC FairPrice for 84.50. Today my freelance client finally paid me that 3200 deposit!"
+    print(f"\n📝 Testing Input: \n\"{test_note}\"\n")
+    print("🧠 Thinking (with strict schema enforcement)...\n")
     
     try:
-        # 1. Parse the string into a Python dictionary
-        parsed_dict = json.loads(clean_json)
-        
-        # 2. Pass it through Pydantic
-        validated_payload = ExtractionPayload.model_validate(parsed_dict)
-        return validated_payload
-        
-    except json.JSONDecodeError as e:
-        # If the LLM didn't output valid JSON, raise an error WITH the raw output
-        raise ValueError(f"LLM failed to output valid JSON. Raw output was:\n\n{raw_response}")
+        result = extract_transactions_from_text(test_note)
+        print("✅ SUCCESS! Validated Pydantic Output:\n")
+        print(result.model_dump_json(indent=2))
     except Exception as e:
-        # Catch Pydantic Validation errors (e.g. wrong category used)
-        raise ValueError(f"LLM output failed validation: {str(e)}\n\nRaw output was:\n\n{raw_response}")
+        print("❌ ERROR:\n")
+        print(str(e))

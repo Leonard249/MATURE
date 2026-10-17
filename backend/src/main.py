@@ -4,7 +4,7 @@ from sqlmodel import Session, select
 from typing import List
 from pydantic import BaseModel
 
-from src.models import (
+from .models import (
     create_db_and_tables, get_session, 
     Transaction, TransactionBase, ExtractionPayload
 )
