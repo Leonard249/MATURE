@@ -38,7 +38,9 @@ User Text:
     return transaction
 
 if __name__ == "__main__":
-    test_note = "Yesterday I grabbed Groceries at NTUC FairPrice for 84.50. Today my freelance client finally paid me that 3200 deposit!"
+    test_note = """8 oct 
+Lunch: 8.6
+Dinner: 8.8"""
     print(f"\n📝 Testing Input: \n\"{test_note}\"\n")
     print("🧠 Thinking (with strict schema enforcement)...\n")
     

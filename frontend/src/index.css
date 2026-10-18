@@ -1,0 +1,11 @@
+@import "tailwindcss";
+
+/* 1. Tell Tailwind v4 to trigger dark mode when the .dark class is present */
+@custom-variant dark (&:is(.dark *));
+
+/* 2. Global styling for smooth transitions */
+@layer base {
+  body {
+    @apply bg-slate-50 text-slate-900 transition-colors duration-300 dark:bg-slate-950 dark:text-slate-100;
+  }
+}
