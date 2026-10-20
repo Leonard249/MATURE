@@ -47,7 +47,7 @@ export default function StagingWorkspace() {
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Paste your unstructured spending notes here..."
+          placeholder="Paste your unstructured spending notes here...(Avoid duplicated notes)"
           className="flex-grow p-4 rounded-xl border border-slate-300 resize-none focus:ring-2 focus:ring-indigo-500 outline-none"
         />
         <button
