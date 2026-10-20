@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from sqlmodel import Session, select, func
+from sqlmodel import Session, select, func, delete
 from typing import List
 from pydantic import BaseModel
 
@@ -59,18 +59,16 @@ def get_transactions(session: Session = Depends(get_session)):
     return session.exec(statement).all()
 
 @app.get("/api/analytics/dashboard")
-def get_dashboard_stats(session: Session = Depends(get_session)):
-    """Aggregates all transaction data for the frontend dashboard."""
-    
-    # 1. Calculate Total Income (Handle None if DB is empty)
+def get_dashboard_stats(session: Session = Depends(get_session)):    
+    # Calc Total Income (Handle None if DB is empty)
     income_stmt = select(func.sum(Transaction.amount)).where(Transaction.transaction_type == "INCOME")
     total_income = session.exec(income_stmt).first() or 0.0
     
-    # 2. Calculate Total Expenses
+    # CalcTotal Expenses
     expense_stmt = select(func.sum(Transaction.amount)).where(Transaction.transaction_type == "EXPENSE")
     total_expenses = session.exec(expense_stmt).first() or 0.0
     
-    # 3. Group Spending by Category (For Recharts Donut Chart)
+    # Group Spending by Category (For Recharts Donut Chart)
     category_stmt = (
         select(Transaction.category, func.sum(Transaction.amount))
         .where(Transaction.transaction_type == "EXPENSE")
@@ -78,8 +76,7 @@ def get_dashboard_stats(session: Session = Depends(get_session)):
     )
     category_breakdown = [{"name": row[0], "value": row[1]} for row in session.exec(category_stmt).all()]
 
-    # 4. Group Spending by Date (For Recharts Bar/Line Chart)
-    # This formats the data perfectly for a time-series graph
+    # Group Spending by Date (For Recharts Bar/Line Chart)
     daily_stmt = (
         select(Transaction.date, func.sum(Transaction.amount))
         .where(Transaction.transaction_type == "EXPENSE")
@@ -105,3 +102,11 @@ def get_dashboard_stats(session: Session = Depends(get_session)):
             "daily_trend": daily_breakdown
         }
     }
+    
+@app.delete("/api/transactions/clear")
+def clear_all_transactions(session: Session = Depends(get_session)):
+    """Wipes all transactions from the database."""
+    statement = delete(Transaction)
+    session.exec(statement)
+    session.commit()
+    return {"status": "success", "message": "Database wiped clean!"}

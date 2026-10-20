@@ -30,10 +30,13 @@ User Text:
 """
 
     # The generator returns the fully validated Pydantic object directly.
-    result = generator(prompt)
+    result = generator(prompt, max_tokens=4000)
     
-    # parse the json result into model
-    transaction = ExtractionPayload.model_validate_json(result)
+    # parse the json result into model, both string json and direct pydantic model output
+    if isinstance(result, str):
+        transaction = ExtractionPayload.model_validate_json(result)
+    else:
+        transaction = result
     
     return transaction
 
