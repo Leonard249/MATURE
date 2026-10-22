@@ -82,6 +82,12 @@ def get_dashboard_analytics(year: int, month: str, session: Session = Depends(ge
     
     trend_data = {abbr: {"month": abbr, "cash_in": 0.0, "cash_out": 0.0} for abbr in calendar.month_abbr[1:]}
     
+    # --- NEW DATA STRUCTURES ---
+    target_month_txns = []
+    dow_totals = {i: 0.0 for i in range(7)}
+    dow_counts = {i: set() for i in range(7)}
+    daily_spend = defaultdict(float)  # Tracks amount spent per MM-DD
+    
     for t in transactions:
         amt = float(t.amount)
         txn_month_num = t.date[5:7] if len(t.date) >= 7 else ""
@@ -93,22 +99,54 @@ def get_dashboard_analytics(year: int, month: str, session: Session = Depends(ge
         if is_expense:
             yearly_out += amt
             cat_yearly[t.category] += amt
+            
             if txn_month_abbr in trend_data:
                 trend_data[txn_month_abbr]["cash_out"] += amt
+                
             if is_target_month:
                 monthly_out += amt
                 cat_monthly[t.category] += amt
-        else:
+                # Track for Top 5
+                target_month_txns.append({
+                    "date": t.date[:10],
+                    "category": t.category,
+                    "description": t.description or "Transaction",
+                    "amount": amt
+                })
+                
+            # Track for Day of Week
+            try:
+                dt = datetime.strptime(t.date[:10], "%Y-%m-%d")
+                dow = dt.weekday() # 0 = Mon, 6 = Sun
+                dow_totals[dow] += amt
+                dow_counts[dow].add(t.date[:10]) # Count unique days to find the average
+            except ValueError:
+                pass
+                
+            # Track for Pacing
+            if len(t.date) >= 10:
+                mm_dd = t.date[5:10]
+                daily_spend[mm_dd] += amt
+                
+        else: # INCOME
             if txn_month_abbr in trend_data:
                 trend_data[txn_month_abbr]["cash_in"] += amt
             if is_target_month:
                 monthly_in += amt
 
-    donut_data = [
+    # formating of responses
+    
+    # Donuts
+    yearly_donut_data = [
         {"name": cat, "value": round(val, 2), "color": COLORS[i % len(COLORS)]}
         for i, (cat, val) in enumerate(sorted(cat_yearly.items(), key=lambda x: x[1], reverse=True))
     ]
+    monthly_donut_data = [
+        {"name": cat, "value": round(val, 2), "color": COLORS[i % len(COLORS)]}
+        for i, (cat, val) in enumerate(sorted(cat_monthly.items(), key=lambda x: x[1], reverse=True))
+    ]
     
+    # Monthly Comparison (Keeping your original logic)
     comparison_data = []
     for cat in cat_yearly.keys():
         comparison_data.append({
@@ -118,16 +156,54 @@ def get_dashboard_analytics(year: int, month: str, session: Session = Depends(ge
         })
     comparison_data = sorted(comparison_data, key=lambda x: x["selected"], reverse=True)[:5]
     
+    # Day of Week Average
+    dow_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    day_of_week = []
+    for i in range(7):
+        avg_spend = dow_totals[i] / len(dow_counts[i]) if len(dow_counts[i]) > 0 else 0
+        day_of_week.append({"day": dow_names[i], "amount": round(avg_spend, 2)})
+        
+    # Top Transactions
+    top_transactions = sorted(target_month_txns, key=lambda x: x["amount"], reverse=True)[:5]
+    
+    # Pacing Data
+    days_in_target_month = calendar.monthrange(year, int(target_month_num))[1]
+    pacing_data = []
+    current_month_cum = 0.0
+    avg_month_cum = 0.0
+    
+    for d in range(1, days_in_target_month + 1):
+        day_str = f"{d:02d}"
+        
+        # Today's spend for target month
+        target_mm_dd = f"{target_month_num}-{day_str}"
+        current_month_cum += daily_spend.get(target_mm_dd, 0.0)
+        
+        # Average spend for this day across all 12 months
+        day_sum = sum(daily_spend.get(f"{m:02d}-{day_str}", 0.0) for m in range(1, 13))
+        avg_month_cum += (day_sum / 12.0)
+        
+        pacing_data.append({
+            "day": d,
+            "current_month": round(current_month_cum, 2),
+            "average_month": round(avg_month_cum, 2)
+        })
+
+    # Savings Rate
     savings_rate = 0
     if monthly_in > 0:
         savings_rate = max(0, round(((monthly_in - monthly_out) / monthly_in) * 100))
 
     return {
         "yearly_total": round(yearly_out, 2),
-        "yearly_donut": donut_data,
+        "yearly_donut": yearly_donut_data,
         "monthly_total": round(monthly_out, 2),
+        "monthly_donut": monthly_donut_data,      
         "monthly_comparison": comparison_data,
         "yearly_trend": list(trend_data.values()),
+        "day_of_week": day_of_week,                 
+        "pacing_data": pacing_data,                 
+        "top_transactions": top_transactions,       
         "savings_rate": savings_rate
     }
 

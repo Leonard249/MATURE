@@ -2,3 +2,5 @@ backend/.venv
 backend/database.db
 backend/.python-version
 backend/src/__pycache__
+
+test.json

@@ -14,9 +14,15 @@ export interface ExtractionPayload {
 export interface DashboardAnalytics {
   yearly_total: number;
   yearly_donut: { name: string; value: number; color: string }[];
-  monthly_total: number;
-  monthly_comparison: { category: string; selected: number; avg: number }[];
   yearly_trend: { month: string; cash_in: number; cash_out: number }[];
+
+  monthly_total: number;
+  monthly_donut: { name: string; value: number; color: string }[];
+  monthly_comparison: { category: string; selected: number; avg: number }[];
+
+  day_of_week: { day: string; amount: number }[];
+  pacing_data: { day: number; current_month: number; average_month: number }[];
+  top_transactions: { date: string; category: string; description: string; amount: number }[];
   savings_rate: number;
 }
 

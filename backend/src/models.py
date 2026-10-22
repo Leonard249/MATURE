@@ -17,6 +17,7 @@ class Category(str, Enum):
     ENTERTAINMENT = "Entertainment"
     SHOPPING = "Shopping"
     HEALTH = "Health & Fitness"
+    INVESTMENT = "Investment"
     OTHER_EXPENSE = "Other Expense"
     OTHER_INCOME = "Other Income"
 

@@ -15,6 +15,7 @@ export default function StagingWorkspace() {
       const result = await api.extractTransactions(text);
       setParsedData(result.transactions);
     } catch (e) {
+      console.log(e);
       alert("Extraction failed. Check the terminal logs.");
     }
     setLoading(false);
@@ -28,6 +29,7 @@ export default function StagingWorkspace() {
       setParsedData(null);
       setText('');
     } catch (e) {
+      console.log(e);
       alert("Failed to commit data.");
     }
   };
@@ -36,7 +38,7 @@ export default function StagingWorkspace() {
     try {
       setParsedData(JSON.parse(e.target.value));
     } catch (err) {
-      // Let the user type temporarily invalid JSON without crashing
+      console.log(err);
     }
   };
 
